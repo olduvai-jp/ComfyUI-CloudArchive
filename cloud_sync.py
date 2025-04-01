@@ -35,6 +35,7 @@ logger.addHandler(handler)
 # グローバル変数
 upload_status = {
     "running": False,
+    "uploading": False,
     "session_id": "",
     "total_files": 0,
     "uploaded_files": 0,
@@ -100,6 +101,9 @@ class S3Uploader:
             return False
         
         try:
+            # アップロード開始を示すフラグを設定
+            upload_status["uploading"] = True
+            
             # ファイル名を取得
             file_name = os.path.basename(file_path)
             
@@ -137,8 +141,10 @@ class S3Uploader:
             upload_status["recent_uploads"].append(upload_info)
             if len(upload_status["recent_uploads"]) > 10:
                 upload_status["recent_uploads"].pop(0)
-            
             logger.debug(f"Successfully uploaded {file_path} to s3://{self.s3_bucket}/{s3_key}")
+            
+            # アップロード完了を示すフラグを設定
+            upload_status["uploading"] = False
             return True
             
         except Exception as e:
@@ -146,6 +152,9 @@ class S3Uploader:
             logger.error(error_msg)
             upload_status["errors"].append(error_msg)
             upload_status["failed_files"] += 1
+            
+            # エラー時もアップロード完了を示すフラグを設定
+            upload_status["uploading"] = False
             return False
 
 class CloudSyncHandler(FileSystemEventHandler):
@@ -261,7 +270,12 @@ def setup_routes():
     @PromptServer.instance.routes.get("/cloud-sync/status")
     async def get_status(request):
         """クラウド同期の状態を取得するエンドポイント"""
-        return web.json_response(upload_status)
+        tmp = upload_status
+
+        # errorsとrecent_uploadsを削除
+        tmp.pop("errors", None)
+        tmp.pop("recent_uploads", None)
+        return web.json_response(tmp)
     
     @PromptServer.instance.routes.post("/cloud-sync/start")
     async def start_uploader(request):
@@ -285,6 +299,7 @@ def setup_routes():
             
             # 状態をリセット
             upload_status["running"] = False
+            upload_status["uploading"] = False
             upload_status["total_files"] = 0
             upload_status["uploaded_files"] = 0
             upload_status["failed_files"] = 0
