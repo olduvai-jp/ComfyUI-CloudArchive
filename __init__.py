@@ -1,4 +1,4 @@
-from .cloud_sync import setup_routes
+from .cloud_archive import setup_routes
 
 setup_routes()
 

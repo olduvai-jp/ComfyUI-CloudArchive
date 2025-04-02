@@ -9,7 +9,7 @@ const circleSvg = `
 `
 
 app.registerExtension({ 
-	name: "comfyui.outputuploader.cloudsync",
+	name: "comfyui.cloudarchive.status",
 	async setup() { 
 
     // インジケーターUIの作成
@@ -21,7 +21,7 @@ app.registerExtension({
     buttonGroupElm.style.alignItems = "center";
     
     // ツールチップの追加
-    buttonGroupElm.title = "Cloud Sync Status: Not Running";
+    buttonGroupElm.title = "Cloud Archive Status: Not Running";
 
     app.menu?.settingsGroup.element.before(buttonGroupElm);
 
@@ -34,7 +34,7 @@ app.registerExtension({
       
       // ツールチップの更新
       if (status) {
-        buttonGroupElm.title = `Cloud Sync Status: ${status}`;
+        buttonGroupElm.title = `Cloud Archive Status: ${status}`;
       }
     }
 
@@ -44,7 +44,7 @@ app.registerExtension({
     // ステータスを定期的に取得する関数
     async function fetchStatus() {
       try {
-        const response = await fetch('/cloud-sync/status');
+        const response = await fetch('/cloud-archive/status');
         if (response.ok) {
           const data = await response.json();
           
@@ -61,7 +61,7 @@ app.registerExtension({
           }
         }
       } catch (error) {
-        console.error('Failed to fetch cloud sync status:', error);
+        console.error('Failed to fetch cloud archive status:', error);
         changeIndicatorColor('#F44336', 'Error');
       }
     }

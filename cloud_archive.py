@@ -18,7 +18,7 @@ from server import PromptServer
 import folder_paths
 
 # ロギングの設定
-logger = logging.getLogger('CloudSync')
+logger = logging.getLogger('CloudArchive')
 logger.setLevel(logging.WARNING)  # INFOからWARNINGに変更して出力を減らす
 logger.propagate = False
 
@@ -28,7 +28,7 @@ if logger.handlers:
 
 # 標準出力へのハンドラを追加
 handler = logging.StreamHandler()
-formatter = logging.Formatter('[Cloud Sync] - %(levelname)s - %(message)s')
+formatter = logging.Formatter('[Cloud Archive] - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
@@ -56,7 +56,7 @@ class S3Uploader:
         self.s3_endpoint_url = os.environ.get('S3_ENDPOINT_URL')
         
         # セッションIDの生成（起動時にユニークなIDでフォルダ分け）
-        self.session_id = str(uuid.uuid4())
+        self.session_id = str(uuid.uuid4())[:13]
         upload_status["session_id"] = self.session_id
         
         # S3クライアントの初期化
@@ -157,7 +157,7 @@ class S3Uploader:
             upload_status["uploading"] = False
             return False
 
-class CloudSyncHandler(FileSystemEventHandler):
+class CloudArchiveHandler(FileSystemEventHandler):
     def __init__(self, uploader: S3Uploader, output_dir: str):
         self.uploader = uploader
         self.output_dir = output_dir
@@ -238,14 +238,14 @@ def start_watcher(output_dir: str) -> Optional[Observer]:
     
     try:
         # ファイルシステムイベントハンドラの設定
-        event_handler = CloudSyncHandler(uploader, output_dir)
+        event_handler = CloudArchiveHandler(uploader, output_dir)
         observer = Observer()
         # 再帰的に監視してサブディレクトリも対象にする
         observer.schedule(event_handler, output_dir, recursive=True)
         observer.start()
         
         upload_status["running"] = True
-        logger.info(f"Cloud Sync: Started watching directory: {output_dir}")
+        logger.info(f"Cloud Archive: Started watching directory: {output_dir}")
         return observer
     except Exception as e:
         error_msg = f"Failed to start directory watcher: {str(e)}"
@@ -259,7 +259,7 @@ def stop_watcher(observer: Observer):
         observer.stop()
         observer.join()
         upload_status["running"] = False
-        logger.info("Cloud Sync: Stopped directory watcher")
+        logger.info("Cloud Archive: Stopped directory watcher")
 
 # グローバル変数
 observer = None
@@ -267,17 +267,12 @@ output_dir = None
 
 def setup_routes():
     """APIエンドポイントのセットアップ"""
-    @PromptServer.instance.routes.get("/cloud-sync/status")
+    @PromptServer.instance.routes.get("/cloud-archive/status")
     async def get_status(request):
         """クラウド同期の状態を取得するエンドポイント"""
-        tmp = upload_status
-
-        # errorsとrecent_uploadsを削除
-        tmp.pop("errors", None)
-        tmp.pop("recent_uploads", None)
-        return web.json_response(tmp)
+        return web.json_response(upload_status)
     
-    @PromptServer.instance.routes.post("/cloud-sync/start")
+    @PromptServer.instance.routes.post("/cloud-archive/start")
     async def start_uploader(request):
         """クラウド同期を開始するエンドポイント"""
         global observer, output_dir
@@ -333,7 +328,7 @@ def setup_routes():
                 "status": upload_status
             }, status=500)
     
-    @PromptServer.instance.routes.post("/cloud-sync/stop")
+    @PromptServer.instance.routes.post("/cloud-archive/stop")
     async def stop_uploader(request):
         """クラウド同期を停止するエンドポイント"""
         global observer
@@ -353,7 +348,7 @@ def setup_routes():
                 "status": upload_status
             })
     
-    @PromptServer.instance.routes.post("/cloud-sync/upload")
+    @PromptServer.instance.routes.post("/cloud-archive/upload")
     async def manual_upload(request):
         """特定のファイルを手動でアップロードするエンドポイント"""
         try:
@@ -406,11 +401,11 @@ def setup_routes():
         # 監視を開始
         observer = start_watcher(output_dir)
         if observer:
-            logger.info(f"Cloud Sync: Automatically started watching directory: {output_dir}")
+            logger.info(f"Cloud Archive: Automatically started watching directory: {output_dir}")
         else:
             logger.error("Failed to automatically start watcher")
     
     # 別スレッドで監視を開始（ComfyUIの起動を妨げないため）
     threading.Thread(target=start_default_watcher).start()
 
-    logger.debug("CloudSync routes have been set up")
+    logger.debug("CloudArchive routes have been set up")

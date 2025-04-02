@@ -1,6 +1,6 @@
-# ComfyUI-CloudSync
+# ComfyUI-CloudArchive
 
-ComfyUI-CloudSyncは、ComfyUIの出力ディレクトリを監視し、生成されたファイルを自動的にAmazon S3またはS3互換ストレージと同期するプラグインです。
+ComfyUI-CloudArchiveは、ComfyUIの出力ディレクトリを監視し、生成されたファイルを自動的にAmazon S3またはS3互換ストレージにアーカイブ（保存）するプラグインです。
 
 ## 機能
 
@@ -18,7 +18,7 @@ ComfyUI-CloudSyncは、ComfyUIの出力ディレクトリを監視し、生成�
 
 ```bash
 cd /path/to/ComfyUI/custom_nodes
-git clone https://github.com/yourusername/ComfyUI-CloudSync.git
+git clone https://github.com/olduvai-jp/ComfyUI-CloudArchive.git
 ```
 
 2. 必要なPythonパッケージをインストールします：
@@ -144,14 +144,6 @@ GET /cloud-sync/status
 
 ```
 POST /cloud-sync/start
-```
-
-リクエスト本文（オプション）：
-
-```json
-{
-  "output_dir": "/path/to/custom/output/directory"
-}
 ```
 
 #### 監視停止
