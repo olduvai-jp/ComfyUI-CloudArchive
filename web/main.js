@@ -12,7 +12,7 @@ app.registerExtension({
 	name: "comfyui.cloudarchive.status",
 	async setup() { 
 
-    // インジケーターUIの作成
+    // Create indicator UI
     const buttonGroup = new ComfyButtonGroup()
     const buttonGroupElm = buttonGroup.element
 
@@ -20,43 +20,43 @@ app.registerExtension({
     buttonGroupElm.style.display = "flex";
     buttonGroupElm.style.alignItems = "center";
     
-    // ツールチップの追加
+    // Add tooltip
     buttonGroupElm.title = "Cloud Archive Status: Not Running";
 
     app.menu?.settingsGroup.element.before(buttonGroupElm);
 
-    // インジケーターの色を変更する関数
+    // Function to change indicator color
     function changeIndicatorColor(color, status) {
       const circle = buttonGroupElm.querySelector('circle');
       if (circle) {
         circle.setAttribute('fill', color);
       }
       
-      // ツールチップの更新
+      // Update tooltip
       if (status) {
         buttonGroupElm.title = `Cloud Archive Status: ${status}`;
       }
     }
 
-    // 初期状態は灰色（未実行）
+    // Initial state is gray (not running)
     changeIndicatorColor('gray', 'Not Running');
 
-    // ステータスを定期的に取得する関数
+    // Function to periodically fetch status
     async function fetchStatus() {
       try {
         const response = await fetch('/cloud-archive/status');
         if (response.ok) {
           const data = await response.json();
           
-          // ステータスに応じてインジケーターの色を変更
+          // Change indicator color based on status
           if (!data.running) {
-            // 非アクティブ状態
+            // Inactive state
             changeIndicatorColor('#808080', 'Not Running');
           } else if (data.uploading) {
-            // アップロード中 - 注意喚起のための黄色
+            // Uploading - yellow for caution
             changeIndicatorColor('#FFC107', 'Uploading - Please do not close');
           } else {
-            // 正常監視中
+            // Normal monitoring
             changeIndicatorColor('#4CAF50', 'Watching');
           }
         }
@@ -66,10 +66,10 @@ app.registerExtension({
       }
     }
 
-    // 初回ステータス取得
+    // Initial status fetch
     fetchStatus();
     
-    // 5秒ごとにステータスを取得
+    // Fetch status every 5 seconds
     setInterval(fetchStatus, 5000);
 	},
 })

@@ -1,44 +1,44 @@
 # ComfyUI-CloudArchive
 
-ComfyUI-CloudArchiveは、ComfyUIの出力ディレクトリを監視し、生成されたファイルを自動的にAmazon S3またはS3互換ストレージにアーカイブ（保存）するプラグインです。
+ComfyUI-CloudArchive is a plugin that monitors the ComfyUI output directory and automatically archives (saves) generated files to Amazon S3 or S3-compatible storage.
 
-## 機能
+## Features
 
-- ComfyUIの出力ディレクトリを監視し、新しいファイルを検出（サブディレクトリも含む）
-- 検出されたファイルを自動的にS3またはS3互換ストレージにアップロード
-- ファイルが完全に書き込まれるまでインテリジェントに待機（ファイルサイズの安定化を検出）
-- 出力ディレクトリの内部構造を保持してアップロード
-- 起動時にユニークなセッションIDを生成し、S3内でフォルダ分け
-- RESTful APIエンドポイントによる状態確認と制御
-- 環境変数による簡単な設定
+- Monitors ComfyUI's output directory and detects new files (including subdirectories)
+- Automatically uploads detected files to S3 or S3-compatible storage
+- Intelligently waits until files are completely written (detects file size stabilization)
+- Preserves the internal structure of the output directory when uploading
+- Generates a unique session ID at startup for folder organization in S3
+- RESTful API endpoints for status checking and control
+- Easy configuration via environment variables
 
-## インストール
+## Installation
 
-1. このリポジトリをComfyUIのカスタムノードディレクトリにクローンします：
+1. Clone this repository into ComfyUI's custom nodes directory:
 
 ```bash
 cd /path/to/ComfyUI/custom_nodes
 git clone https://github.com/olduvai-jp/ComfyUI-CloudArchive.git
 ```
 
-2. 必要なPythonパッケージをインストールします：
+2. Install the required Python packages:
 
 ```bash
 pip install boto3 watchdog
 ```
 
-## 設定
+## Configuration
 
-以下の環境変数を設定してください：
+Set the following environment variables:
 
-- `S3_ACCESS_KEY_ID` (必須): ストレージサービスのアクセスキーID
-- `S3_SECRET_ACCESS_KEY` (必須): ストレージサービスのシークレットアクセスキー
-- `S3_REGION` (オプション): ストレージサービスのリージョン（デフォルト: us-east-1）
-- `S3_BUCKET` (必須): アップロード先のバケット名
-- `S3_PREFIX` (オプション): バケット内のプレフィックス（デフォルト: comfyui-outputs）
-- `S3_ENDPOINT_URL` (オプション): S3互換エンドポイントのURL（MinIO、Wasabi、DigitalOcean Spacesなど）
+- `S3_ACCESS_KEY_ID` (required): Access key ID for the storage service
+- `S3_SECRET_ACCESS_KEY` (required): Secret access key for the storage service
+- `S3_REGION` (optional): Region for the storage service (default: us-east-1)
+- `S3_BUCKET` (required): Bucket name for uploads
+- `S3_PREFIX` (optional): Prefix within the bucket (default: comfyui-outputs)
+- `S3_ENDPOINT_URL` (optional): URL for S3-compatible endpoint (MinIO, Wasabi, DigitalOcean Spaces, etc.)
 
-環境変数の設定例（Linux/Mac）：
+Example environment variable setup (Linux/Mac):
 
 ```bash
 export S3_ACCESS_KEY_ID=your_access_key
@@ -60,20 +60,20 @@ set S3_PREFIX=comfyui/outputs
 set S3_ENDPOINT_URL=https://minio.example.com
 ```
 
-### S3互換エンドポイントの使用
+### Using S3-Compatible Endpoints
 
-このプラグインは、Amazon S3だけでなく、S3互換のストレージサービスにも対応しています。以下のようなサービスで使用できます：
+This plugin supports not only Amazon S3 but also S3-compatible storage services. It can be used with services such as:
 
 - [MinIO](https://min.io/)
 - [Wasabi](https://wasabi.com/)
 - [DigitalOcean Spaces](https://www.digitalocean.com/products/spaces)
 - [Backblaze B2](https://www.backblaze.com/b2/cloud-storage.html)
 - [Scaleway Object Storage](https://www.scaleway.com/en/object-storage/)
-- その他のS3互換サービス
+- Other S3-compatible services
 
-S3互換サービスを使用するには、`S3_ENDPOINT_URL`環境変数にエンドポイントのURLを設定してください。
+To use an S3-compatible service, set the `S3_ENDPOINT_URL` environment variable to the endpoint URL of the service.
 
-#### MinIOの例：
+#### MinIO Example:
 
 ```bash
 export S3_ACCESS_KEY_ID=your_minio_access_key
@@ -82,7 +82,7 @@ export S3_BUCKET=your-minio-bucket
 export S3_ENDPOINT_URL=http://minio.example.com:9000
 ```
 
-#### Wasabiの例：
+#### Wasabi Example:
 
 ```bash
 export S3_ACCESS_KEY_ID=your_wasabi_access_key
@@ -92,7 +92,7 @@ export S3_BUCKET=your-wasabi-bucket
 export S3_ENDPOINT_URL=https://s3.wasabisys.com
 ```
 
-#### DigitalOcean Spacesの例：
+#### DigitalOcean Spaces Example:
 
 ```bash
 export S3_ACCESS_KEY_ID=your_spaces_key
@@ -102,23 +102,23 @@ export S3_BUCKET=your-space-name
 export S3_ENDPOINT_URL=https://nyc3.digitaloceanspaces.com
 ```
 
-## 使い方
+## Usage
 
-### 自動起動
+### Automatic Startup
 
-プラグインはComfyUIの起動時に自動的に開始され、デフォルトの出力ディレクトリ（`ComfyUI/output`）を監視します。
+The plugin starts automatically when ComfyUI is launched and monitors the default output directory (`ComfyUI/output`).
 
-### APIエンドポイント
+### API Endpoints
 
-以下のAPIエンドポイントが利用可能です：
+The following API endpoints are available:
 
-#### 状態確認
+#### Status Check
 
 ```
 GET /cloud-sync/status
 ```
 
-レスポンス例：
+Example response:
 
 ```json
 {
@@ -140,25 +140,25 @@ GET /cloud-sync/status
 }
 ```
 
-#### 監視開始
+#### Start Monitoring
 
 ```
 POST /cloud-sync/start
 ```
 
-#### 監視停止
+#### Stop Monitoring
 
 ```
 POST /cloud-sync/stop
 ```
 
-#### 手動アップロード
+#### Manual Upload
 
 ```
 POST /cloud-sync/upload
 ```
 
-リクエスト本文：
+Request body:
 
 ```json
 {
@@ -166,33 +166,33 @@ POST /cloud-sync/upload
 }
 ```
 
-## S3のディレクトリ構造
+## S3 Directory Structure
 
-アップロードされたファイルは以下の構造でS3に保存されます：
+Uploaded files are stored in S3 with the following structure:
 
 ```
 {S3_PREFIX}/{SESSION_ID}/{RELATIVE_PATH}
 ```
 
-例：
+Example:
 
 ```
 comfyui-outputs/550e8400-e29b-41d4-a716-446655440000/image_01.png
 comfyui-outputs/550e8400-e29b-41d4-a716-446655440000/subfolder/image_02.png
 ```
 
-出力ディレクトリの内部構造（サブディレクトリなど）は保持されます。
+The internal structure of the output directory (including subdirectories) is preserved.
 
-## トラブルシューティング
+## Troubleshooting
 
-### 環境変数が設定されていない
+### Environment Variables Not Set
 
-必要な環境変数が設定されていない場合、エラーメッセージがログに記録され、`/cloud-sync/status`エンドポイントの`errors`フィールドに表示されます。
+If the required environment variables are not set, error messages will be logged and displayed in the `errors` field of the `/cloud-sync/status` endpoint.
 
-### アップロードに失敗する
+### Upload Failures
 
-アップロードに失敗した場合、エラーメッセージがログに記録され、`/cloud-sync/status`エンドポイントの`errors`フィールドに表示されます。また、`failed_files`カウンターが増加します。
+If an upload fails, error messages will be logged and displayed in the `errors` field of the `/cloud-sync/status` endpoint. The `failed_files` counter will also increase.
 
-## ライセンス
+## License
 
 MIT

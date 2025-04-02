@@ -17,22 +17,22 @@ from server import PromptServer
 
 import folder_paths
 
-# ロギングの設定
+# Logging configuration
 logger = logging.getLogger('CloudArchive')
-logger.setLevel(logging.WARNING)  # INFOからWARNINGに変更して出力を減らす
+logger.setLevel(logging.WARNING)  # Changed from INFO to WARNING to reduce output
 logger.propagate = False
 
-# 既存のハンドラをクリア
+# Clear existing handlers
 if logger.handlers:
     logger.handlers.clear()
 
-# 標準出力へのハンドラを追加
+# Add handler for standard output
 handler = logging.StreamHandler()
 formatter = logging.Formatter('[Cloud Archive] - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-# グローバル変数
+# Global variables
 upload_status = {
     "running": False,
     "uploading": False,
@@ -47,7 +47,7 @@ upload_status = {
 
 class S3Uploader:
     def __init__(self):
-        # 環境変数からS3の設定を取得
+        # Get S3 configuration from environment variables
         self.aws_access_key_id = os.environ.get('S3_ACCESS_KEY_ID')
         self.aws_secret_access_key = os.environ.get('S3_SECRET_ACCESS_KEY')
         self.aws_region = os.environ.get('S3_REGION', 'us-east-1')
@@ -55,22 +55,22 @@ class S3Uploader:
         self.s3_prefix = os.environ.get('S3_PREFIX', 'comfyui-outputs')
         self.s3_endpoint_url = os.environ.get('S3_ENDPOINT_URL')
         
-        # セッションIDの生成（起動時にユニークなIDでフォルダ分け）
+        # Generate session ID (create unique folder at startup)
         self.session_id = str(uuid.uuid4())[:13]
         upload_status["session_id"] = self.session_id
         
-        # S3クライアントの初期化
+        # Initialize S3 client
         self.s3_client = None
         if self.aws_access_key_id and self.aws_secret_access_key and self.s3_bucket:
             try:
-                # S3クライアントの設定
+                # Configure S3 client
                 client_kwargs = {
                     'aws_access_key_id': self.aws_access_key_id,
                     'aws_secret_access_key': self.aws_secret_access_key,
                     'region_name': self.aws_region
                 }
                 
-                # S3互換エンドポイントが指定されている場合は追加
+                # Add S3-compatible endpoint if specified
                 if self.s3_endpoint_url:
                     client_kwargs['endpoint_url'] = self.s3_endpoint_url
                 
@@ -94,44 +94,44 @@ class S3Uploader:
             upload_status["errors"].append(error_msg)
     
     def upload_file(self, file_path: str, base_dir: str = None) -> bool:
-        """ファイルをS3にアップロードする"""
+        """Upload a file to S3"""
         if not self.s3_client:
             logger.error("S3 client not initialized. Cannot upload file.")
             upload_status["errors"].append("S3 client not initialized. Cannot upload file.")
             return False
         
         try:
-            # アップロード開始を示すフラグを設定
+            # Set flag indicating upload has started
             upload_status["uploading"] = True
             
-            # ファイル名を取得
+            # Get the filename
             file_name = os.path.basename(file_path)
             
-            # ディレクトリ構造を保持するためのパス計算
+            # Calculate path to preserve directory structure
             if base_dir:
-                # base_dirからの相対パスを計算
+                # Calculate relative path from base_dir
                 try:
                     rel_path = os.path.relpath(file_path, base_dir)
-                    # Windowsパスを/に変換
+                    # Convert Windows paths to /
                     rel_path = rel_path.replace('\\', '/')
                 except ValueError:
-                    # file_pathがbase_dirの外にある場合
+                    # If file_path is outside base_dir
                     rel_path = file_name
             else:
-                # base_dirが指定されていない場合はファイル名のみ
+                # If base_dir is not specified, use only the filename
                 rel_path = file_name
             
-            # S3のキーを生成（セッションIDでフォルダ分け、ディレクトリ構造を保持）
+            # Generate S3 key (organize by session ID, preserve directory structure)
             s3_key = f"{self.s3_prefix}/{self.session_id}/{rel_path}"
             
-            # ファイルをアップロード
+            # Upload the file
             self.s3_client.upload_file(file_path, self.s3_bucket, s3_key)
             
-            # アップロード成功の情報を記録
+            # Record successful upload information
             upload_status["uploaded_files"] += 1
             upload_status["last_upload_time"] = datetime.now().isoformat()
             
-            # 最近のアップロード履歴に追加（最大10件）
+            # Add to recent upload history (maximum 10 entries)
             upload_info = {
                 "file_name": file_name,
                 "s3_key": s3_key,
@@ -143,7 +143,7 @@ class S3Uploader:
                 upload_status["recent_uploads"].pop(0)
             logger.debug(f"Successfully uploaded {file_path} to s3://{self.s3_bucket}/{s3_key}")
             
-            # アップロード完了を示すフラグを設定
+            # Set flag indicating upload is complete
             upload_status["uploading"] = False
             return True
             
@@ -153,7 +153,7 @@ class S3Uploader:
             upload_status["errors"].append(error_msg)
             upload_status["failed_files"] += 1
             
-            # エラー時もアップロード完了を示すフラグを設定
+            # Set flag indicating upload is complete even on error
             upload_status["uploading"] = False
             return False
 
@@ -161,13 +161,13 @@ class CloudArchiveHandler(FileSystemEventHandler):
     def __init__(self, uploader: S3Uploader, output_dir: str):
         self.uploader = uploader
         self.output_dir = output_dir
-        # ファイルサイズ安定化待機の設定
-        self.max_wait_time = 30  # 最大待機時間（秒）
-        self.check_interval = 0.5  # チェック間隔（秒）
-        self.size_stable_count = 3  # サイズが安定したと判断するためのチェック回数
+        # Configuration for waiting for file size stabilization
+        self.max_wait_time = 30  # Maximum wait time (seconds)
+        self.check_interval = 0.5  # Check interval (seconds)
+        self.size_stable_count = 3  # Number of checks to determine if size has stabilized
     
     def wait_for_file_completion(self, file_path: str) -> bool:
-        """ファイルが完全に書き込まれるまで待機する"""
+        """Wait until the file is completely written"""
         start_time = time.time()
         last_size = -1
         stable_count = 0
@@ -176,15 +176,15 @@ class CloudArchiveHandler(FileSystemEventHandler):
         
         while time.time() - start_time < self.max_wait_time:
             try:
-                # ファイルが存在するか確認
+                # Check if the file exists
                 if not os.path.exists(file_path):
                     logger.warning(f"File disappeared while waiting: {file_path}")
                     return False
                 
-                # 現在のファイルサイズを取得
+                # Get current file size
                 current_size = os.path.getsize(file_path)
                 
-                # ファイルサイズが前回と同じかチェック
+                # Check if file size is the same as last time
                 if current_size == last_size:
                     stable_count += 1
                     if stable_count >= self.size_stable_count:
@@ -194,29 +194,29 @@ class CloudArchiveHandler(FileSystemEventHandler):
                     stable_count = 0
                     last_size = current_size
                 
-                # 少し待機
+                # Wait a bit
                 time.sleep(self.check_interval)
                 
             except (IOError, OSError) as e:
-                # ファイルがロックされているか、アクセスできない場合
+                # If the file is locked or inaccessible
                 logger.warning(f"Error accessing file {file_path}: {str(e)}")
                 time.sleep(self.check_interval)
         
         logger.warning(f"Timed out waiting for file to stabilize: {file_path}")
-        # タイムアウトしても最善を尽くしてアップロードを試みる
+        # Try to upload even if timed out, doing our best
         return True
     
     def on_created(self, event):
         if not event.is_directory:
             file_path = event.src_path
             
-            # 全てのファイルをアップロード対象とする
+            # Consider all files as upload targets
             logger.debug(f"New file detected: {file_path}")
             upload_status["total_files"] += 1
             
-            # ファイルが完全に書き込まれるまで待機
+            # Wait until the file is completely written
             if self.wait_for_file_completion(file_path):
-                # アップロード（output_dirからの相対パスを保持）
+                # Upload (preserving relative path from output_dir)
                 self.uploader.upload_file(file_path, self.output_dir)
             else:
                 error_msg = f"Failed to upload {file_path}: File was not stable"
@@ -225,11 +225,11 @@ class CloudArchiveHandler(FileSystemEventHandler):
                 upload_status["failed_files"] += 1
 
 def start_watcher(output_dir: str) -> Optional[Observer]:
-    """出力ディレクトリの監視を開始する"""
-    # S3アップローダーの初期化
+    """Start monitoring the output directory"""
+    # Initialize S3 uploader
     uploader = S3Uploader()
     
-    # 出力ディレクトリが存在するか確認
+    # Check if output directory exists
     if not os.path.exists(output_dir):
         error_msg = f"Output directory does not exist: {output_dir}"
         logger.error(error_msg)
@@ -237,10 +237,10 @@ def start_watcher(output_dir: str) -> Optional[Observer]:
         return None
     
     try:
-        # ファイルシステムイベントハンドラの設定
+        # Set up filesystem event handler
         event_handler = CloudArchiveHandler(uploader, output_dir)
         observer = Observer()
-        # 再帰的に監視してサブディレクトリも対象にする
+        # Monitor recursively to include subdirectories
         observer.schedule(event_handler, output_dir, recursive=True)
         observer.start()
         
@@ -254,45 +254,45 @@ def start_watcher(output_dir: str) -> Optional[Observer]:
         return None
 
 def stop_watcher(observer: Observer):
-    """ディレクトリの監視を停止する"""
+    """Stop monitoring the directory"""
     if observer:
         observer.stop()
         observer.join()
         upload_status["running"] = False
         logger.info("Cloud Archive: Stopped directory watcher")
 
-# グローバル変数
+# Global variables
 observer = None
 output_dir = None
 
 def setup_routes():
-    """APIエンドポイントのセットアップ"""
+    """Set up API endpoints"""
     @PromptServer.instance.routes.get("/cloud-archive/status")
     async def get_status(request):
-        """クラウド同期の状態を取得するエンドポイント"""
+        """Endpoint to get cloud sync status"""
         return web.json_response(upload_status)
     
     @PromptServer.instance.routes.post("/cloud-archive/start")
     async def start_uploader(request):
-        """クラウド同期を開始するエンドポイント"""
+        """Endpoint to start cloud sync"""
         global observer, output_dir
         
         try:
-            # 外部からの出力ディレクトリ指定は危ないのでなし
+            # No output directory specification from outside as it's dangerous
             # data = await request.json()
             # new_output_dir = data.get("output_dir")
             new_output_dir = None
             
-            # 出力ディレクトリが指定されていない場合はデフォルトを使用
+            # Use default if output directory is not specified
             if not new_output_dir:
-                # ComfyUIのデフォルト出力ディレクトリを使用
+                # Use ComfyUI's default output directory
                 new_output_dir = folder_paths.get_output_directory()
             
-            # 既に実行中の場合は停止
+            # Stop if already running
             if observer:
                 stop_watcher(observer)
             
-            # 状態をリセット
+            # Reset status
             upload_status["running"] = False
             upload_status["uploading"] = False
             upload_status["total_files"] = 0
@@ -302,7 +302,7 @@ def setup_routes():
             upload_status["errors"] = []
             upload_status["recent_uploads"] = []
             
-            # 新しい監視を開始
+            # Start new monitoring
             output_dir = new_output_dir
             observer = start_watcher(output_dir)
             
@@ -330,7 +330,7 @@ def setup_routes():
     
     @PromptServer.instance.routes.post("/cloud-archive/stop")
     async def stop_uploader(request):
-        """クラウド同期を停止するエンドポイント"""
+        """Endpoint to stop cloud sync"""
         global observer
         
         if observer:
@@ -350,7 +350,7 @@ def setup_routes():
     
     @PromptServer.instance.routes.post("/cloud-archive/upload")
     async def manual_upload(request):
-        """特定のファイルを手動でアップロードするエンドポイント"""
+        """Endpoint to manually upload a specific file"""
         try:
             data = await request.json()
             file_path = data.get("file_path")
@@ -369,11 +369,11 @@ def setup_routes():
                     "status": upload_status
                 }, status=404)
             
-            # S3アップローダーの初期化
+            # Initialize S3 uploader
             uploader = S3Uploader()
             upload_status["total_files"] += 1
             
-            # アップロード（output_dirが指定されている場合はそれを基準にする）
+            # Upload (using output_dir as reference if specified)
             success = uploader.upload_file(file_path, output_dir)
             
             return web.json_response({
@@ -391,21 +391,21 @@ def setup_routes():
                 "status": upload_status
             }, status=500)
 
-    # 起動時に自動的に監視を開始
+    # Automatically start monitoring at startup
     def start_default_watcher():
         global observer, output_dir
         
-        # ComfyUIのデフォルト出力ディレクトリを使用
+        # Use ComfyUI's default output directory
         output_dir = folder_paths.get_output_directory()
         
-        # 監視を開始
+        # Start monitoring
         observer = start_watcher(output_dir)
         if observer:
             logger.info(f"Cloud Archive: Automatically started watching directory: {output_dir}")
         else:
             logger.error("Failed to automatically start watcher")
     
-    # 別スレッドで監視を開始（ComfyUIの起動を妨げないため）
+    # Start monitoring in a separate thread (to avoid blocking ComfyUI startup)
     threading.Thread(target=start_default_watcher).start()
 
     logger.debug("CloudArchive routes have been set up")
