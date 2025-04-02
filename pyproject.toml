@@ -1,0 +1,15 @@
+[project]
+name = "comfyui-cloudarchive"
+description = "Automatically archives generated files to Amazon S3 or S3-compatible storage services"
+version = "1.0.0"
+license = {file = "LICENSE"}
+dependencies = ["boto3", "watchdog"]
+
+[project.urls]
+Repository = "https://github.com/olduvai-jp/ComfyUI-CloudArchive"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = "olduvai-jp"
+DisplayName = "ComfyUI-CloudArchive"
+Icon = ""
