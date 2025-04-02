@@ -19,7 +19,7 @@ import folder_paths
 
 # Logging configuration
 logger = logging.getLogger('CloudArchive')
-logger.setLevel(logging.WARNING)  # Changed from INFO to WARNING to reduce output
+logger.setLevel(logging.INFO)
 logger.propagate = False
 
 # Clear existing handlers
