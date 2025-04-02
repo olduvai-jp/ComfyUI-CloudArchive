@@ -4,7 +4,7 @@ import { ComfyButton } from "../../scripts/ui/components/button.js";
 
 const circleSvg = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-  <circle cx="12" cy="12" r="10" fill="gray" />
+  <circle cx="12" cy="12" r="5" fill="gray" />
 </svg>
 `
 
