@@ -162,7 +162,7 @@ class CloudArchiveHandler(FileSystemEventHandler):
         self.uploader = uploader
         self.output_dir = output_dir
         # Configuration for waiting for file size stabilization
-        self.max_wait_time = 30  # Maximum wait time (seconds)
+        self.max_wait_time = 60*5  # Maximum wait time (seconds)
         self.check_interval = 0.5  # Check interval (seconds)
         self.size_stable_count = 3  # Number of checks to determine if size has stabilized
     
@@ -184,17 +184,18 @@ class CloudArchiveHandler(FileSystemEventHandler):
                 # Get current file size
                 current_size = os.path.getsize(file_path)
                 
-                # Check if file size is the same as last time
-                if current_size == last_size:
-                    stable_count += 1
-                    if stable_count >= self.size_stable_count:
-                        logger.debug(f"File size stabilized at {current_size} bytes after {time.time() - start_time:.2f} seconds")
-                        return True
-                else:
-                    stable_count = 0
-                    last_size = current_size
+                # For non-zero files, check stabilization
+                if current_size > 0:
+                    if current_size == last_size:
+                        stable_count += 1
+                        if stable_count >= self.size_stable_count:
+                            logger.debug(f"File size stabilized at {current_size} bytes after {time.time() - start_time:.2f} seconds")
+                            return True
+                    else:
+                        stable_count = 0
+                        last_size = current_size
                 
-                # Wait a bit
+                # Wait for next check
                 time.sleep(self.check_interval)
                 
             except (IOError, OSError) as e:
