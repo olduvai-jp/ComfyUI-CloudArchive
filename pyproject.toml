@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-cloudarchive"
 description = "Automatically archives generated files to Amazon S3 or S3-compatible storage services"
-version = "1.0.0"
+version = "1.0.1"
 license = {file = "LICENSE"}
 dependencies = ["boto3", "watchdog"]
 
