@@ -93,6 +93,43 @@ class S3Uploader:
             logger.error(error_msg)
             upload_status["errors"].append(error_msg)
     
+    def get_formatted_prefix(self) -> str:
+        """
+        Replace date format placeholders in prefix with current timestamp.
+        Supports common date format patterns like {Y}, {m}, {d}, {H}, {M}, {S}
+        """
+        if not self.s3_prefix:
+            return self.s3_prefix
+        
+        now = datetime.now()
+        
+        # Define format mappings
+        format_mappings = {
+            '{Y}': now.strftime('%Y'),      # 4-digit year
+            '{y}': now.strftime('%y'),      # 2-digit year
+            '{m}': now.strftime('%m'),      # month (01-12)
+            '{d}': now.strftime('%d'),      # day (01-31)
+            '{H}': now.strftime('%H'),      # hour (00-23)
+            '{M}': now.strftime('%M'),      # minute (00-59)
+            '{S}': now.strftime('%S'),      # second (00-59)
+            '{j}': now.strftime('%j'),      # day of year (001-366)
+            '{W}': now.strftime('%W'),      # week number (00-53)
+            '{w}': now.strftime('%w'),      # weekday (0-6, Sunday=0)
+            '{U}': now.strftime('%U'),      # week number (00-53, Sunday=0)
+            '{V}': now.strftime('%V'),      # ISO week number (01-53)
+            '{B}': now.strftime('%B'),      # full month name
+            '{b}': now.strftime('%b'),      # abbreviated month name
+            '{A}': now.strftime('%A'),      # full weekday name
+            '{a}': now.strftime('%a'),      # abbreviated weekday name
+        }
+        
+        # Replace all format placeholders
+        formatted_prefix = self.s3_prefix
+        for placeholder, value in format_mappings.items():
+            formatted_prefix = formatted_prefix.replace(placeholder, value)
+        
+        return formatted_prefix
+    
     def upload_file(self, file_path: str, base_dir: str = None) -> bool:
         """Upload a file to S3"""
         if not self.s3_client:
@@ -122,7 +159,9 @@ class S3Uploader:
                 rel_path = file_name
             
             # Generate S3 key (organize by session ID, preserve directory structure)
-            s3_key = f"{self.s3_prefix}/{self.session_id}/{rel_path}"
+            # Apply date formatting to prefix
+            formatted_prefix = self.get_formatted_prefix()
+            s3_key = f"{formatted_prefix}/{self.session_id}/{rel_path}"
             
             # Upload the file
             self.s3_client.upload_file(file_path, self.s3_bucket, s3_key)
