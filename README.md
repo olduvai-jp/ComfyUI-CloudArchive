@@ -102,6 +102,61 @@ export S3_BUCKET=your-space-name
 export S3_ENDPOINT_URL=https://nyc3.digitaloceanspaces.com
 ```
 
+### Date Format in S3_PREFIX
+
+The `S3_PREFIX` environment variable supports date format placeholders that are replaced with the current timestamp at upload time. This allows you to organize files by date automatically.
+
+#### Supported Format Placeholders
+
+| Placeholder | Description | Example |
+|-------------|-------------|---------|
+| `{Y}` | 4-digit year | 2024 |
+| `{y}` | 2-digit year | 24 |
+| `{m}` | Month (01-12) | 01, 12 |
+| `{d}` | Day (01-31) | 01, 31 |
+| `{H}` | Hour (00-23) | 00, 23 |
+| `{M}` | Minute (00-59) | 00, 59 |
+| `{S}` | Second (00-59) | 00, 59 |
+| `{j}` | Day of year (001-366) | 001, 366 |
+| `{W}` | Week number (00-53) | 00, 53 |
+| `{w}` | Weekday (0-6, Sunday=0) | 0, 6 |
+| `{U}` | Week number (00-53, Sunday=0) | 00, 53 |
+| `{V}` | ISO week number (01-53) | 01, 53 |
+| `{B}` | Full month name | January, December |
+| `{b}` | Abbreviated month name | Jan, Dec |
+| `{A}` | Full weekday name | Monday, Sunday |
+| `{a}` | Abbreviated weekday name | Mon, Sun |
+
+#### Examples
+
+```bash
+# Organize by year/month/day
+export S3_PREFIX=comfyui-outputs/{Y}/{m}/{d}
+
+# Organize by year/month with session
+export S3_PREFIX=comfyui-outputs/{Y}/{m}
+
+# Include time information
+export S3_PREFIX=comfyui-outputs/{Y}/{m}/{d}/{H}
+
+# Use abbreviated month names
+export S3_PREFIX=comfyui-outputs/{Y}/{b}
+```
+
+#### Result Examples
+
+If you set `S3_PREFIX=comfyui-outputs/{Y}/{m}/{d}` and upload on January 15, 2024, files will be stored as:
+
+```
+comfyui-outputs/2024/01/15/session_id/filename.png
+```
+
+If you set `S3_PREFIX=comfyui-outputs/{Y}/{b}` and upload in January 2024, files will be stored as:
+
+```
+comfyui-outputs/2024/Jan/session_id/filename.png
+```
+
 ## Usage
 
 ### Automatic Startup
