@@ -8,7 +8,7 @@ ComfyUI-CloudArchive is a plugin that monitors the ComfyUI output directory and 
 - Automatically uploads detected files to S3 or S3-compatible storage
 - Intelligently waits until files are completely written (detects file size stabilization)
 - Preserves the internal structure of the output directory when uploading
-- Generates a unique session ID at startup for folder organization in S3
+- Supports optional session-based prefixes via `{session_id}` placeholder
 - RESTful API endpoints for status checking and control
 - Easy configuration via environment variables
 
@@ -37,6 +37,7 @@ Set the following environment variables:
 - `S3_BUCKET` (required): Bucket name for uploads
 - `S3_PREFIX` (optional): Prefix within the bucket (default: comfyui-outputs)
 - `S3_ENDPOINT_URL` (optional): URL for S3-compatible endpoint (MinIO, Wasabi, DigitalOcean Spaces, etc.)
+- `S3_ENABLE_CONFLICT_RENAME` (optional): When `true` (default) rename on conflicts as `file (n).ext`; when `false` overwrite existing objects
 
 Example environment variable setup (Linux/Mac):
 
@@ -47,6 +48,7 @@ export S3_REGION=ap-northeast-1
 export S3_BUCKET=your-bucket-name
 export S3_PREFIX=comfyui/outputs
 export S3_ENDPOINT_URL=https://minio.example.com
+export S3_ENABLE_CONFLICT_RENAME=true
 ```
 
 Windows:
@@ -58,6 +60,7 @@ set S3_REGION=ap-northeast-1
 set S3_BUCKET=your-bucket-name
 set S3_PREFIX=comfyui/outputs
 set S3_ENDPOINT_URL=https://minio.example.com
+set S3_ENABLE_CONFLICT_RENAME=true
 ```
 
 ### Using S3-Compatible Endpoints
@@ -145,17 +148,22 @@ export S3_PREFIX=comfyui-outputs/{Y}/{b}
 
 #### Result Examples
 
-If you set `S3_PREFIX=comfyui-outputs/{Y}/{m}/{d}` and upload on January 15, 2024, files will be stored as:
+If you set `S3_PREFIX=comfyui-outputs/{Y}/{m}/{d}/{session_id}` and upload on January 15, 2024, files will be stored as:
 
 ```
-comfyui-outputs/2024/01/15/session_id/filename.png
+comfyui-outputs/2024/01/15/550e8400-e29b-41d4-a716-446655440000/filename.png
 ```
 
 If you set `S3_PREFIX=comfyui-outputs/{Y}/{b}` and upload in January 2024, files will be stored as:
 
 ```
-comfyui-outputs/2024/Jan/session_id/filename.png
+comfyui-outputs/2024/Jan/filename.png
 ```
+
+### Conflict Handling and Session IDs
+
+- Conflict handling: When `S3_ENABLE_CONFLICT_RENAME` is `true` (default), uploads check for existing objects and, if a key already exists, save as `name (1).ext`, `name (2).ext`, ... until an unused name is found (up to 100 attempts). Set to `false` to allow overwrites.
+- Session ID usage: A session ID is generated at startup but applied only if `S3_PREFIX` explicitly contains `{session_id}`. If omitted, no session folder is added to the key.
 
 ## Usage
 
@@ -226,14 +234,18 @@ Request body:
 Uploaded files are stored in S3 with the following structure:
 
 ```
-{S3_PREFIX}/{SESSION_ID}/{RELATIVE_PATH}
+{S3_PREFIX}/{RELATIVE_PATH}
 ```
 
 Example:
 
 ```
-comfyui-outputs/550e8400-e29b-41d4-a716-446655440000/image_01.png
-comfyui-outputs/550e8400-e29b-41d4-a716-446655440000/subfolder/image_02.png
+comfyui-outputs/image_01.png
+comfyui-outputs/subfolder/image_02.png
+
+# With session placeholder:
+comfyui-outputs/2024/01/15/550e8400-e29b-41d4-a716-446655440000/image_01.png
+comfyui-outputs/2024/01/15/550e8400-e29b-41d4-a716-446655440000/subfolder/image_02.png
 ```
 
 The internal structure of the output directory (including subdirectories) is preserved.

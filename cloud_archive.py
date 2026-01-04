@@ -54,6 +54,8 @@ class S3Uploader:
         self.s3_bucket = os.environ.get('S3_BUCKET')
         self.s3_prefix = os.environ.get('S3_PREFIX', 'comfyui-outputs')
         self.s3_endpoint_url = os.environ.get('S3_ENDPOINT_URL')
+        self.conflict_rename_enabled = os.environ.get('S3_ENABLE_CONFLICT_RENAME', 'true').lower() not in ['false', '0', 'no', 'off']
+        self.max_conflict_attempts = 100
         
         # Generate session ID (create unique folder at startup)
         self.session_id = str(uuid.uuid4())[:13]
@@ -129,7 +131,62 @@ class S3Uploader:
             formatted_prefix = formatted_prefix.replace(placeholder, value)
         
         return formatted_prefix
-    
+
+    def _build_s3_key(self, rel_path: str) -> Optional[str]:
+        """Build S3 key with optional conflict resolution"""
+        formatted_prefix = self.get_formatted_prefix()
+
+        if formatted_prefix and '{session_id}' in formatted_prefix:
+            formatted_prefix = formatted_prefix.replace('{session_id}', self.session_id)
+
+        cleaned_prefix = formatted_prefix.strip('/') if formatted_prefix else ''
+        cleaned_rel_path = rel_path.lstrip('/')
+        base_key = f"{cleaned_prefix}/{cleaned_rel_path}" if cleaned_prefix else cleaned_rel_path
+
+        if not self.conflict_rename_enabled:
+            return base_key
+
+        return self._resolve_conflicts(base_key)
+
+    def _object_exists(self, s3_key: str) -> Optional[bool]:
+        try:
+            self.s3_client.head_object(Bucket=self.s3_bucket, Key=s3_key)
+            return True
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code")
+            if error_code in ["404", "NoSuchKey", "NotFound"]:
+                return False
+            error_msg = f"Error checking existence for {s3_key}: {str(e)}"
+            logger.error(error_msg)
+            upload_status["errors"].append(error_msg)
+            return None
+        except Exception as e:
+            error_msg = f"Unexpected error checking existence for {s3_key}: {str(e)}"
+            logger.error(error_msg)
+            upload_status["errors"].append(error_msg)
+            return None
+
+    def _resolve_conflicts(self, base_key: str) -> Optional[str]:
+        exists = self._object_exists(base_key)
+        if exists is None:
+            return None
+        if exists is False:
+            return base_key
+
+        base_name, ext = os.path.splitext(base_key)
+        for idx in range(1, self.max_conflict_attempts + 1):
+            candidate = f"{base_name} ({idx}){ext}"
+            exists = self._object_exists(candidate)
+            if exists is None:
+                return None
+            if exists is False:
+                return candidate
+
+        error_msg = f"Failed to find available S3 key for {base_key} after {self.max_conflict_attempts} attempts"
+        logger.error(error_msg)
+        upload_status["errors"].append(error_msg)
+        return None
+
     def upload_file(self, file_path: str, base_dir: str = None) -> bool:
         """Upload a file to S3"""
         if not self.s3_client:
@@ -158,10 +215,11 @@ class S3Uploader:
                 # If base_dir is not specified, use only the filename
                 rel_path = file_name
             
-            # Generate S3 key (organize by session ID, preserve directory structure)
-            # Apply date formatting to prefix
-            formatted_prefix = self.get_formatted_prefix()
-            s3_key = f"{formatted_prefix}/{self.session_id}/{rel_path}"
+            s3_key = self._build_s3_key(rel_path)
+            if s3_key is None:
+                upload_status["failed_files"] += 1
+                upload_status["uploading"] = False
+                return False
             
             # Upload the file
             self.s3_client.upload_file(file_path, self.s3_bucket, s3_key)
@@ -180,7 +238,7 @@ class S3Uploader:
             upload_status["recent_uploads"].append(upload_info)
             if len(upload_status["recent_uploads"]) > 10:
                 upload_status["recent_uploads"].pop(0)
-            logger.debug(f"Successfully uploaded {file_path} to s3://{self.s3_bucket}/{s3_key}")
+            logger.info(f"Uploaded {file_path} to s3://{self.s3_bucket}/{s3_key}")
             
             # Set flag indicating upload is complete
             upload_status["uploading"] = False
